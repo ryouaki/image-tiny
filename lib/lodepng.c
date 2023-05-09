@@ -5356,6 +5356,7 @@ static void decodeGeneric(unsigned char** out, unsigned* w, unsigned* h,
     lodepng_memset(*out, 0, outsize);
     state->error = postProcessScanlines(*out, scanlines, *w, *h, &state->info_png);
   }
+  printf("%s", *out);
   lodepng_free(scanlines);
 }
 
