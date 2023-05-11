@@ -53,8 +53,9 @@ func main() {
 	C.liq_set_dithering_level(imageResult, 1.0)
 
 	pixelsSize := width * height
-	raw8bitPixels := make([]byte, pixelsSize*4)
-	C.liq_write_remapped_image(imageResult, image, unsafe.Pointer(&raw8bitPixels[0]), (C.ulong)(pixelsSize))
+	raw8bitPixels := make([]byte, pixelsSize)
+	rawPoint := unsafe.Pointer(&raw8bitPixels[0])
+	C.liq_write_remapped_image(imageResult, image, rawPoint, (C.ulong)(pixelsSize))
 	palette := C.liq_get_palette(imageResult)
 
 	var state C.LodePNGState
@@ -71,7 +72,7 @@ func main() {
 
 	var imageOutData *C.uchar
 	var size uint64
-	outStatus := C.lodepng_encode(&imageOutData, (*C.ulong)(&size), (*C.uchar)(unsafe.Pointer(&raw8bitPixels)), width, height, &state)
+	outStatus := C.lodepng_encode(&imageOutData, (*C.ulong)(&size), (*C.uchar)(rawPoint), width, height, &state)
 	if outStatus > 0 {
 		fmt.Println("Can't encode image: %s\n", C.lodepng_error_text(outStatus))
 		os.Exit(99)
