@@ -1,5 +1,17 @@
 package main
 
+import (
+	"bytes"
+	"fmt"
+	"image"
+	"image/jpeg"
+	"io/ioutil"
+	"os"
+	"unsafe"
+
+	"github.com/ryouaki/koa"
+)
+
 /*
 #cgo CFLAGS: -I.
 #cgo LDFLAGS: -L./ -limagequant
@@ -9,28 +21,45 @@ package main
 #include "./lodepng.h"
 */
 import "C"
-import (
-	"fmt"
-	"io/ioutil"
-	"os"
-	"unsafe"
-)
 
 func main() {
+	app := koa.New() // 初始化服务对象
 
-	defer func() {
-		if err := recover(); err != nil { //注意必须要判断
-			fmt.Println(err)
+	// 设置api路由，其中var为url传参
+	app.Post("/compress", func(ctx *koa.Context, next koa.Next) {
+		err := ctx.Req.ParseMultipartForm(1048576)
+		if err != nil {
+			fmt.Println(err.Error())
 		}
-	}() //用来调用此匿名函数
-	sourceFile, _ := ioutil.ReadFile("./demo.png")
 
-	imageOut := unsafe.Pointer(&sourceFile[0])
+		// form := ctx.Req.MultipartForm
+		file, handler, err := ctx.Req.FormFile("file")
+		defer file.Close()
+
+		p := make([]byte, handler.Size)
+		i, e := file.Read(p)
+		if e != nil {
+			fmt.Println(e.Error())
+		} else {
+			fmt.Println(i)
+		}
+
+		compressPng(p)
+	})
+
+	err := app.Run(8080) // 启动
+	if err != nil {      // 是否发生错误
+		fmt.Println(err)
+	}
+}
+
+func compressPng(data []byte) ([]byte, error) {
+	imageOut := unsafe.Pointer(&data[0])
 
 	width := C.uint(0)
 	height := C.uint(0)
 
-	datalen := C.ulong(len(sourceFile))
+	datalen := C.ulong(len(data))
 
 	var imageIn *C.uchar = nil
 
@@ -83,4 +112,27 @@ func main() {
 		fmt.Println(err)
 	}
 
+	C.liq_result_destroy(imageResult)
+	C.liq_image_destroy(image)
+	C.liq_attr_destroy(attrHandle)
+
+	C.lodepng_state_cleanup(&state)
+
+	return nil, nil
+}
+
+func compressJpeg(data []byte) ([]byte, error) {
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return data, err
+	}
+	buf := bytes.Buffer{}
+	err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 80}) // 固定压缩质量80，对画质影响最小
+	if err != nil {
+		return data, err
+	}
+	if buf.Len() > len(data) {
+		return data, fmt.Errorf("Compress failed")
+	}
+	return buf.Bytes(), nil
 }
