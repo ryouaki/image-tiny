@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"html/template"
 	"path"
 	"unsafe"
 
@@ -21,6 +23,25 @@ import "C"
 
 func main() {
 	app := koa.New() // 初始化服务对象
+
+	app.Get("/", func(ctx *koa.Context, n koa.Next) {
+		tpl, err := template.ParseFiles("static/index.html")
+		if err != nil {
+			ctx.Status = 404
+			ctx.SetBody([]byte("Page not found"))
+			return
+		}
+
+		buf := new(bytes.Buffer)
+		err = tpl.Execute(buf, nil)
+		if err != nil {
+			ctx.Status = 404
+			ctx.SetBody([]byte("Page not found"))
+			return
+		}
+
+		ctx.SetBody(buf.Bytes())
+	})
 
 	// 设置api路由，其中var为url传参
 	app.Post("/compress", func(ctx *koa.Context, next koa.Next) {

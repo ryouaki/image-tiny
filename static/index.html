@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<head>
+  <title>Image-Tiny - Ryouaki</title>
+  <style>
+    #list >div {
+      display: flex;
+    }
+
+    #list >div >div {
+      padding-right: 12px;
+      border: 1px solid #e5e5e5;
+    }
+
+    #list >div img {
+      height: 120px;
+    }
+  </style>
+  <script>
+    var onChange = function (e) {
+      var target = e.target;
+      var files = target.files;
+      var srcFileSize = 0;
+      var srcFileName = '';
+      var descFileSize = 0
+
+      if (files.length > 0) {
+        if (files[0].type !== 'image/png') {
+          alert('Just support image/png')
+          return;
+        }
+        srcFileSize = files[0].size;
+        srcFileName = files[0].name;
+
+        var form = new FormData();
+        form.append('file', files[0]);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('post', '/compress');
+        xhr.responseType = "blob";
+        xhr.onreadystatechange = () => {
+          if (xhr.readyState === 4) {
+            distFileSize = xhr.response.size;
+            console.log(srcFileSize, descFileSize)
+
+            var parent = document.querySelector('#list');
+            var root = document.createElement('div');
+
+            var name = document.createElement('div');
+
+            var srcSize = document.createElement('div');
+            var distSize = document.createElement('div');
+            var ratio = document.createElement('div');
+            var image1 = document.createElement('div');
+            var image2 = document.createElement('div');
+
+            name.innerText = srcFileName;
+            srcSize.innerText = srcFileSize;
+            distSize.innerText = distFileSize;
+
+            ratio.innerText = (((srcFileSize - distFileSize) / srcFileSize) * 100).toFixed(2) + '%';
+
+            var img1 = new Image()
+            img1.src = URL.createObjectURL(xhr.response);
+            image1.append(img1);
+            
+
+            var img2 = new Image()
+            img2.src = URL.createObjectURL(files[0]);
+            image2.append(img2);
+
+            root.appendChild(name);
+            root.appendChild(srcSize);
+            root.appendChild(distSize);
+            root.appendChild(ratio);
+            root.appendChild(image1);
+            root.appendChild(image2);
+
+            parent.appendChild(root);
+          }
+        }
+        xhr.send(form);
+      }
+    }
+  </script>
+</head>
+<body>
+  <!--fmt.Println(err.Error())-->
+  <input type="file" onchange="onChange">
+  <div id="list">
+
+  </div>
+  <script>
+    var inputs = document.querySelectorAll("input[type='file']")
+    inputs.forEach((i) => {
+      i.addEventListener('change', onChange)
+    })
+  </script>
+</body>
