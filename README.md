@@ -33,9 +33,11 @@ A image optimize service for PNG(done), JPEG(doing), JPG(doing).
   $ make build // 打包
 ```
 
-## 测试
+## 测试接口
 该接口直接返回图片内容。前端需要自己处理一下
 ```sh
   curl --location 'localhost:8080/compress' --form 'file=@"/Users/user/Documents/WorkDocs/image-tiny/demo.png"'
 ```
 
+## Web
+![](./demo.png)
