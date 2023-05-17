@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
-	"io/ioutil"
-	"os"
+	"path"
+	"strconv"
 	"unsafe"
 
 	"github.com/ryouaki/koa"
@@ -17,6 +17,7 @@ import (
 #cgo LDFLAGS: -L./ -limagequant
 #cgo LDFLAGS: -L./ -llodepng
 
+#include <stdlib.h>
 #include "libimagequant.h"
 #include "./lodepng.h"
 */
@@ -27,24 +28,53 @@ func main() {
 
 	// 设置api路由，其中var为url传参
 	app.Post("/compress", func(ctx *koa.Context, next koa.Next) {
-		err := ctx.Req.ParseMultipartForm(1048576)
+		file, handler, err := ctx.Req.FormFile("file")
+		quality := ctx.Req.PostFormValue("quality")
+
 		if err != nil {
-			fmt.Println(err.Error())
+			ctx.Status = 400
+			ctx.SetBody([]byte(err.Error()))
+			return
 		}
 
-		// form := ctx.Req.MultipartForm
-		file, handler, err := ctx.Req.FormFile("file")
 		defer file.Close()
 
 		p := make([]byte, handler.Size)
-		i, e := file.Read(p)
+		_, e := file.Read(p)
 		if e != nil {
-			fmt.Println(e.Error())
-		} else {
-			fmt.Println(i)
+			ctx.Status = 500
+			ctx.SetBody([]byte(e.Error()))
+			return
 		}
 
-		compressPng(p)
+		fileExt := path.Ext(handler.Filename)
+		var image []byte
+		var ee error
+		if fileExt == ".png" {
+			image, ee = compressPng(p)
+		} else if fileExt == ".jpeg" {
+			var q int
+			if quality != "" {
+				i, _ := strconv.Atoi(quality)
+				q = i
+			} else {
+				q = 80
+			}
+			image, ee = compressJpeg(p, q)
+		} else {
+			ctx.Status = 400
+			ctx.SetBody([]byte("Just support PNG&JPEG"))
+			return
+		}
+
+		if ee != nil {
+			ctx.Status = 500
+			ctx.SetBody([]byte(ee.Error()))
+			return
+		}
+
+		ctx.SetHeader("Content-Type", "image/png")
+		ctx.SetBody(image)
 	})
 
 	err := app.Run(8080) // 启动
@@ -66,18 +96,18 @@ func compressPng(data []byte) ([]byte, error) {
 	loadStatus := C.lodepng_decode32(&imageIn, &width, &height, (*C.uchar)(imageOut), datalen)
 
 	if loadStatus > 0 {
-		fmt.Println("Error:", C.GoString(C.lodepng_error_text(loadStatus)))
-		os.Exit(99)
+		return nil, fmt.Errorf(C.GoString(C.lodepng_error_text(loadStatus)))
 	}
 
 	attrHandle := C.liq_attr_create()
+	defer C.liq_attr_destroy(attrHandle)
 	image := C.liq_image_create_rgba(attrHandle, unsafe.Pointer(imageIn), C.int(width), C.int(height), 0)
-
+	defer C.liq_image_destroy(image)
 	var imageResult *C.liq_result
 	if C.liq_image_quantize(image, attrHandle, &imageResult) != C.LIQ_OK {
-		fmt.Println("Error:", "liq_image_quantize Failed")
-		os.Exit(99)
+		return nil, fmt.Errorf("Quantize failed")
 	}
+	defer C.liq_result_destroy(imageResult)
 
 	C.liq_set_dithering_level(imageResult, 1.0)
 
@@ -89,6 +119,7 @@ func compressPng(data []byte) ([]byte, error) {
 
 	var state C.LodePNGState
 	C.lodepng_state_init(&state)
+	defer C.lodepng_state_cleanup(&state)
 	state.info_raw.colortype = C.LCT_PALETTE
 	state.info_raw.bitdepth = 8
 	state.info_png.color.colortype = C.LCT_PALETTE
@@ -103,36 +134,28 @@ func compressPng(data []byte) ([]byte, error) {
 	var size uint64
 	outStatus := C.lodepng_encode(&imageOutData, (*C.ulong)(&size), (*C.uchar)(rawPoint), width, height, &state)
 	if outStatus > 0 {
-		fmt.Println("Can't encode image: %s\n", C.lodepng_error_text(outStatus))
-		os.Exit(99)
+		return nil, fmt.Errorf(C.GoString(C.lodepng_error_text(outStatus)))
 	}
+	defer C.free(unsafe.Pointer(imageOutData))
 
-	err := ioutil.WriteFile("./demo1.png", ([]byte)(string(C.GoBytes(unsafe.Pointer(imageOutData), C.int(size)))), 0666)
-	if err != nil {
-		fmt.Println(err)
-	}
+	retData := C.GoBytes(unsafe.Pointer(imageOutData), C.int(size))
 
-	C.liq_result_destroy(imageResult)
-	C.liq_image_destroy(image)
-	C.liq_attr_destroy(attrHandle)
-
-	C.lodepng_state_cleanup(&state)
-
-	return nil, nil
+	return retData, nil
 }
 
-func compressJpeg(data []byte) ([]byte, error) {
+func compressJpeg(data []byte, q int) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return data, err
 	}
 	buf := bytes.Buffer{}
-	err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 80}) // 固定压缩质量80，对画质影响最小
+	err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: q}) // 固定压缩质量80，对画质影响最小
 	if err != nil {
 		return data, err
 	}
-	if buf.Len() > len(data) {
-		return data, fmt.Errorf("Compress failed")
-	}
+	// if buf.Len() > len(data) {
+	// 	return data, fmt.Errorf("Compress failed")
+	// }
+	fmt.Println(buf.Len(), len(data))
 	return buf.Bytes(), nil
 }
