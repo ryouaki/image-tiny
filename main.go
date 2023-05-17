@@ -1,12 +1,8 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"image"
-	"image/jpeg"
 	"path"
-	"strconv"
 	"unsafe"
 
 	"github.com/ryouaki/koa"
@@ -53,14 +49,17 @@ func main() {
 		if fileExt == ".png" {
 			image, ee = compressPng(p)
 		} else if fileExt == ".jpeg" {
-			var q int
-			if quality != "" {
-				i, _ := strconv.Atoi(quality)
-				q = i
-			} else {
-				q = 80
-			}
-			image, ee = compressJpeg(p, q)
+			// var q int
+			// if quality != "" {
+			// 	i, _ := strconv.Atoi(quality)
+			// 	q = i
+			// } else {
+			// 	q = 80
+			// }
+			// image, ee = compressJpeg(p, q)
+			ctx.Status = 400
+			ctx.SetBody([]byte("JPEG doesn't support now. Please waiting for it"))
+			return
 		} else {
 			ctx.Status = 400
 			ctx.SetBody([]byte("Just support PNG&JPEG"))
@@ -143,19 +142,19 @@ func compressPng(data []byte) ([]byte, error) {
 	return retData, nil
 }
 
-func compressJpeg(data []byte, q int) ([]byte, error) {
-	img, _, err := image.Decode(bytes.NewReader(data))
-	if err != nil {
-		return data, err
-	}
-	buf := bytes.Buffer{}
-	err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: q}) // 固定压缩质量80，对画质影响最小
-	if err != nil {
-		return data, err
-	}
-	// if buf.Len() > len(data) {
-	// 	return data, fmt.Errorf("Compress failed")
-	// }
-	fmt.Println(buf.Len(), len(data))
-	return buf.Bytes(), nil
-}
+// func compressJpeg(data []byte, q int) ([]byte, error) {
+// 	img, _, err := image.Decode(bytes.NewReader(data))
+// 	if err != nil {
+// 		return data, err
+// 	}
+// 	buf := bytes.Buffer{}
+// 	err = jpeg.Encode(&buf, img, &jpeg.Options{Quality: q}) // 固定压缩质量80，对画质影响最小
+// 	if err != nil {
+// 		return data, err
+// 	}
+// 	// if buf.Len() > len(data) {
+// 	// 	return data, fmt.Errorf("Compress failed")
+// 	// }
+// 	fmt.Println(buf.Len(), len(data))
+// 	return buf.Bytes(), nil
+// }
