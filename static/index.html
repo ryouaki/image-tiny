@@ -75,6 +75,12 @@
             root.appendChild(image1);
             root.appendChild(image2);
 
+            var alink = document.createElement('a');
+            alink.innerText = '下载';
+            alink.href = img1.src;
+            alink.download = srcFileName;
+            image1.appendChild(alink)
+
             parent.appendChild(root);
           }
         }
