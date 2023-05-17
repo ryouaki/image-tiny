@@ -21,7 +21,7 @@ unzip ./libimagequant-main.zip
 
 cd ./libimagequant-main/imagequant-sys
 
-if [ -n ${TARGET} ]; then
+if [ ! -n ${TARGET} ]; then
   cargo build --release --target ${TARGET}
 else
   cargo build --release
@@ -38,7 +38,7 @@ fi
 
 cp ./imagequant-sys/libimagequant.h ../../libimagequant.h
 
-if [ -n ${TARGET} ]; then
+if [ ! -n ${TARGET} ]; then
 cp ./target/${TARGET}/release/libimagequant_sys.a ../../libimagequant.a
 else
 cp ./target/release/libimagequant_sys.a ../../libimagequant.a

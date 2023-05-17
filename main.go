@@ -25,7 +25,7 @@ func main() {
 	// 设置api路由，其中var为url传参
 	app.Post("/compress", func(ctx *koa.Context, next koa.Next) {
 		file, handler, err := ctx.Req.FormFile("file")
-		quality := ctx.Req.PostFormValue("quality")
+		// quality := ctx.Req.PostFormValue("quality")
 
 		if err != nil {
 			ctx.Status = 400
